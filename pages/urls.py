@@ -3,7 +3,7 @@ from rest_framework import routers
 from . import views
 from . import controler
 from .api import UserViewSet, IntervaloTiempoViewSet
-
+from .views import IntervaloTiempoList, IntervaloTiempoDetail
 router = routers.DefaultRouter()
 router.register(r'/user', UserViewSet, basename='user')
 router.register(r'/intervalo-tiempo-list', IntervaloTiempoViewSet, basename='intervalo_tiempo_list')
@@ -25,6 +25,8 @@ urlpatterns = [
 
     # Agrega otras URL para eliminar si es necesario
     path('api', include(router.urls)),
+    path('api/intervalo-tiempo-list/', IntervaloTiempoList.as_view(), name='intervalo-tiempo-list'),
+    path('api/intervalo-tiempo-detail/<int:pk>/', IntervaloTiempoDetail.as_view(), name='intervalo-tiempo-detail'),
 
     path('', views.index, name='index'),
 

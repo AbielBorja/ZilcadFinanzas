@@ -17,4 +17,4 @@ class UserSerializer(serializers.ModelSerializer):
 class IntervaloTiempoSerializer(serializers.ModelSerializer):
     class Meta:
         model = IntervaloTiempo
-        fields = ['id', 'hora_inicio', 'hora_fin', 'costo_servicio']
+        fields = '__all__'

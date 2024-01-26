@@ -5,6 +5,7 @@ import json
 from datetime import datetime
 
 
+
 def dataTableFinanzas(request):
     with open('pages\static\BaseGeneral.json', encoding='utf-8-sig') as d:
         data = json.load(d)

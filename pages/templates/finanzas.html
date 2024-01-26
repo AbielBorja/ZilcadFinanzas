@@ -17,7 +17,7 @@
     <script src="https://code.jquery.com/jquery-1.12.3.min.js"></script>
     <script src="https://kendo.cdn.telerik.com/2023.3.1114/mjs/kendo.all.js" type="module"></script>
     <script src="../static/js/kendo-ui-license.js"></script>
-
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 </head>
 
 <body class="sb-nav-fixed">
@@ -133,17 +133,6 @@
                 <div class="container-fluid px-4">
                     <div class="d-flex align-items-center">
                         <h1 class="mt-4 me-2">Dashboard</h1>
-                        {% if crear_form.errors %}
-                        <div class="alert alert-danger" role="alert">
-                            <strong>Error en el formulario:</strong>
-                            {% for field, error_list in crear_form.errors.items %}
-                            {{ field }}:
-                            {% for error in error_list %}
-                            {{ error }}
-                            {% endfor %}
-                            {% endfor %}
-                        </div>
-                        {% endif %}
                         <div class="spinner-border" role="status" id="loading-spinner">
                             <span class="visually-hidden">Loading...</span>
                         </div>
@@ -201,6 +190,33 @@
                             </div>
                         </div>
                     </div>
+                    {% if crear_form.errors %}
+                    <div class="alert alert-danger" role="alert">
+                        <strong>Error en el formulario:</strong>
+                        {% for field, error_list in crear_form.errors.items %}
+                        {{ field }}:
+                        {% for error in error_list %}
+                        {{ error }}
+                        {% endfor %}
+                        {% endfor %}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    {% endif %}
+
+                    <div class="alert alert-success" role="alert" id="mensajeExito" style="display: none;">
+                        <strong>¡Intervalo actualizado con éxito!</strong>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+
+                    {% if messages %}
+                    <div class="alert alert-success" role="alert">
+                        <strong>Exitoso</strong>
+                        {% for message in messages %}
+                        {{ message }}
+                        {% endfor %}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    {% endif %}
                     <div class="card mb-4">
                         <div class="card-header">
                             <i class="fas fa-table me-1"></i>
@@ -294,16 +310,22 @@
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
-                        <div class="cs-form">
-                            <form method="post">
-                                {% csrf_token %}
-                                {{ editar_form.as_p }}
-                                {% for error in editar_form.non_field_errors %}
-                                <div class="alert alert-danger" role="alert">{{ error }}</div>
-                                {% endfor %}
-                                <button type="submit" class="btn btn-primary">Guardar cambios</button>
-                            </form>
+                        {% for intervalo in intervalos_tiempo %}
+                        <div class="row justify-content-around">
+                            <div class="col">
+                                <ul>
+                                    <li><strong>Hora de inicio:</strong> {{ intervalo.hora_inicio|date:'H:i:s' }}</li>
+                                    <li><strong>Hora fin:</strong> {{ intervalo.hora_fin|date:'H:i:s' }}</li>
+                                    <li><strong>Costo de servicio:</strong> {{ intervalo.costo_servicio }}</li>
+                                </ul>
+                            </div>
+                            <div class="col align-self-center text-center">
+                                <button class="btn btn-primary btn-block" data-bs-target="#modalEdit2"
+                                    data-bs-toggle="modal" onclick="editarIntervalo({{ intervalo.id }})">Editar</button>
+                            </div>
                         </div>
+                        <hr> <!-- Separador -->
+                        {% endfor %}
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cerrar</button>
@@ -311,6 +333,41 @@
                 </div>
             </div>
         </div>
+
+        <div class="modal fade" id="modalEdit2" aria-hidden="true" aria-labelledby="modalEditLabel2" tabindex="-1">
+            <div class="modal-dialog modal-dialog-centered">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h1 class="modal-title fs-5" id="modalEditToggleLabel2">Modal 2</h1>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <!-- Agrega un formulario de edición al mismo HTML -->
+                        <div class="cs-form">
+                            <form id="editarIntervaloForm">
+                                <label for="id_hora_inicio_edit">Hora de inicio:</label>
+                                <input type="text" id="id_hora_inicio_edit" name="hora_inicio_edit" required>
+
+                                <label for="id_hora_fin_edit">Hora de fin:</label>
+                                <input type="text" id="id_hora_fin_edit" name="hora_fin_edit" required>
+
+                                <label for="id_costo_servicio_edit">Costo de servicio:</label>
+                                <input class="form-control" type="number" id="id_costo_servicio_edit"
+                                    name="costo_servicio_edit" step="0.01" required>
+
+                                <button class="btn btn-primary" onclick="guardarEdicionIntervalo()">Guardar
+                                    Cambios</button>
+                            </form>
+                        </div>
+                    </div>
+                    <div class=" modal-footer">
+                        <button class="btn btn-primary" data-bs-target="#modalEdit" data-bs-toggle="modal">Volver a
+                            edición</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- Modal Crear -->
         <div class="modal fade" id="modalAdd" data-bs-backdrop="static" data-bs-keyboard="false" tabindex="-1"
             aria-labelledby="modalAddLabel" aria-hidden="true">
@@ -383,16 +440,129 @@
 
             // Configuración para ambos formularios
             $(".time-duration-picker").kendoTimeDurationPicker({
-                separator: " || ",
+                separator: " : ",
                 columns: [
-                    { name: "hours", format: "## HH:", min: 0, max: 24 },
-                    { name: "minutes", format: "## :MM", min: 0, max: 50, step: 5 },
-                    { name: "seconds", format: "## :SS", min: 0, max: 60, step: 10 }
+                    { name: "hours", format: "## Hora", min: 0, max: 24 },
+                    { name: "minutes", format: "## Minutos", min: 0, max: 50, step: 5 },
+                    { name: "seconds", format: "## Segundos", min: 0, max: 60, step: 10 }
                 ]
             });
         });
     </script>
 
+    <script>
+
+        // Función para convertir cadena de hora (HH:mm:ss) a milisegundos
+        function convertirHoraAMilisegundos(hora) {
+            var partes = hora.split(':');
+            var horas = parseInt(partes[0], 10) || 0;
+            var minutos = parseInt(partes[1], 10) || 0;
+            var segundos = parseInt(partes[2], 10) || 0;
+
+            return horas * 3600000 + minutos * 60000 + segundos * 1000;
+        }
+
+        // Función para inicializar o destruir kendoTimeDurationPicker con valores específicos
+        function manejarKendoTimeDurationPicker(id, valorInicial) {
+            var picker = $("#" + id).data("kendoTimeDurationPicker");
+            if (picker) {
+                // Destruir la instancia existente si existe
+                picker.destroy();
+            }
+
+            // Inicializar kendoTimeDurationPicker para los campos de hora de inicio y fin
+            $("#" + id).kendoTimeDurationPicker({
+                columns: ["hours", "minutes"],
+                // Puedes ajustar los shortcuts según tus necesidades
+                shortcuts: [
+                    { text: "1h 30min", value: 5400000 }
+                ],
+                value: convertirHoraAMilisegundos(valorInicial)  // Convierte la cadena a milisegundos
+            });
+        }
+
+        var intervaloIdEnEdicion;
+
+        function editarIntervalo(intervaloId) {
+            // Hacer una solicitud AJAX para obtener los datos del intervalo
+            $.ajax({
+                url: `/api/intervalo-tiempo-detail/${intervaloId}/`,
+                method: 'GET',
+                success: function (data) {
+                    // Llenar el formulario con los datos recibidos
+                    $('#id_hora_inicio_edit').val(data.hora_inicio);
+                    $('#id_hora_fin_edit').val(data.hora_fin);
+                    $('#id_costo_servicio_edit').val(data.costo_servicio);
+
+                    console.log(data.hora_fin)
+                    // Inicializar kendoTimeDurationPicker para los campos de hora de inicio y fin
+                    manejarKendoTimeDurationPicker('id_hora_inicio_edit', data.hora_inicio);
+                    manejarKendoTimeDurationPicker('id_hora_fin_edit', data.hora_fin);
+
+                    // Abrir el modal de edición
+                    $('#modalEdit').modal('show');
+
+                    intervaloIdEnEdicion = intervaloId
+                    console.log(intervaloId);
+                },
+                error: function (error) {
+                    console.error('Error al obtener datos del intervalo:', error);
+                }
+            });
+        }
+
+        function guardarEdicionIntervalo(intervaloId) {
+            // Obtener los datos del formulario de edición
+            var horaInicio = $('#id_hora_inicio_edit').val();
+            var horaFin = $('#id_hora_fin_edit').val();
+            var costoServicio = $('#id_costo_servicio_edit').val();
+
+            console.log(intervaloId);
+            // Crear un objeto con los datos del formulario
+            var datosEdicion = {
+                hora_inicio: horaInicio,
+                hora_fin: horaFin,
+                costo_servicio: costoServicio
+            };
+
+            if (intervaloIdEnEdicion !== undefined && intervaloIdEnEdicion !== null) {
+                // Hacer lo que necesitas con intervaloIdEnEdicion
+                console.log('ID del intervalo en edición:', intervaloIdEnEdicion);
+                // Hacer una solicitud AJAX para actualizar el intervalo
+                $.ajax({
+                    url: `/api/intervalo-tiempo-detail/${intervaloIdEnEdicion}/`,
+                    method: 'PUT',
+                    data: datosEdicion,
+                    success: function (data) {
+                        console.log('Intervalo actualizado con éxito:', data);
+
+                        // Cerrar todos los modales usando Bootstrap 5
+                        $('#modalEdit').modal('hide');
+                        $('#modalEdit2').modal('hide');
+
+                        // Obtener la referencia a la alerta de éxito
+                        var alertaExito = $('#mensajeExito');
+
+                        // Obtener la referencia al contenido de la alerta de éxito
+                        var contenidoMensajeExito = $('#contenidoMensajeExito');
+
+                        // Modificar el contenido de la alerta
+                        contenidoMensajeExito.text('¡Intervalo actualizado con éxito!');
+
+                        // Añadir clases de Bootstrap para la alerta de éxito
+                        alertaExito.removeClass('alert-danger').addClass('alert-success');
+
+                        // Mostrar la alerta de éxito
+                        alertaExito.fadeIn().delay(2300).fadeOut();
+                    },
+                    error: function (error) {
+                        console.error('Error al actualizar el intervalo:', error);
+                    }
+                });
+            }
+
+        }
+    </script>
 
 </body>
 

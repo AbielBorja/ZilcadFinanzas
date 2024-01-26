@@ -4,7 +4,10 @@ from .models import IntervaloTiempo
 class CrearIntervaloTiempoForm(forms.ModelForm):
     hora_inicio = forms.DurationField(widget=forms.TimeInput(attrs={'class': 'time-duration-picker'}))
     hora_fin = forms.DurationField(widget=forms.TimeInput(attrs={'class': 'time-duration-picker'}))
-
+    costo_servicio = forms.DecimalField(
+        widget=forms.NumberInput(attrs={'class': 'form-control'}),
+        min_value=0.01  # Puedes ajustar esto según tus necesidades
+    )
     class Meta:
         model = IntervaloTiempo
         fields = ['hora_inicio', 'hora_fin', 'costo_servicio']
