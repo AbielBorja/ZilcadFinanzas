@@ -8,111 +8,75 @@ from django.contrib import messages
 from rest_framework import generics
 from .models import IntervaloTiempo
 from .serializers import IntervaloTiempoSerializer
+from django.views.decorators.http import require_GET
 
 def finanzas(request):
     data = dataTableFinanzas(request)
     # Transforma las claves con espacios en claves con guiones bajos
     
-    intervalos_tiempo = IntervaloTiempo.objects.all()
-    editar_form = EditarIntervaloTiempoForm()
-    crear_form = CrearIntervaloTiempoForm()
+    intervalos_tiempo = IntervaloTiempo.objects.all()            
 
-    # Lógica para manejar la edición de intervalo de tiempo
-    if request.method == 'POST':
-        print("Entre aqui 1")
-        if 'editar_intervalo_id' in request.POST:
-            # Lógica para editar el intervalo
-            intervalo_id = request.POST['editar_intervalo_id']
-            intervalo_editar = IntervaloTiempo.objects.get(id=intervalo_id)
-            editar_form = EditarIntervaloTiempoForm(request.POST, instance=intervalo_editar)
-            if editar_form.is_valid():
-                editar_form.save()
-
-        else:
-            crear_intervalo_tiempo(request)
-            
-
-    return render(request, 'finanzas.html', {'intervalos_tiempo': intervalos_tiempo, 'crear_form': crear_form, 'editar_form': editar_form})
+    return render(request, 'finanzas.html', {'intervalos_tiempo': intervalos_tiempo})
     return render(request, 'finanzas.html', {'data': data, 'intervalos_tiempo': intervalos_tiempo, 'crear_form': crear_form, 'editar_form': editar_form})
 
+@require_GET
+def verificar_superposicion(request, intervalo_id):
+    try:
+        hora_inicio_milisegundos = int(request.GET.get('hora_inicio'))
+        hora_fin_milisegundos = int(request.GET.get('hora_fin'))
 
-def editar_intervalo_tiempo(request, pk):
-    intervalo = get_object_or_404(IntervaloTiempo, pk=pk)
+        # Convertir milisegundos a timedelta
+        hora_inicio = timedelta(seconds=hora_inicio_milisegundos / 1000)
+        hora_fin = timedelta(seconds=hora_fin_milisegundos / 1000)
 
-    if request.method == 'POST':
-        form = EditarIntervaloTiempoForm(request.POST, instance=intervalo)
-        if form.is_valid():
-            nuevo_intervalo = form.save(commit=False)
+        # Crear objetos de tiempo para hora_inicio y hora_fin
+        hora_inicio_obj = time(hour=hora_inicio.seconds // 3600, minute=(hora_inicio.seconds // 60) % 60)
+        hora_fin_obj = time(hour=hora_fin.seconds // 3600, minute=(hora_fin.seconds // 60) % 60)
 
-            # Verifica que el nuevo intervalo no se superponga con otros
-            superpuestos = IntervaloTiempo.objects.filter(
-                hora_inicio__lt=nuevo_intervalo.hora_fin,
-                hora_fin__gt=nuevo_intervalo.hora_inicio
-            ).exclude(pk=nuevo_intervalo.pk)
+        # Obtener el intervalo existente para comparar
+        intervalo_existente = IntervaloTiempo.objects.exclude(id=intervalo_id).filter(
+            hora_inicio__lt=hora_fin_obj,
+            hora_fin__gt=hora_inicio_obj
+        )
 
-            if not superpuestos.exists():
-                nuevo_intervalo.save()
-                return redirect('tu_vista_de_intervalos')  # Reemplaza con la vista donde se muestran los intervalos
-            else:
-                form.add_error(None, 'El intervalo se superpone con otro existente.')
+        superpuesto = intervalo_existente.exists()
 
-    else:
-        form = EditarIntervaloTiempoForm(instance=intervalo)
+        return JsonResponse({'superpuesto': superpuesto})
 
-    return render(request, 'tu_template_de_edicion.html', {'form': form})
+    except ValueError:
+        # Manejar errores de conversión de tipo de datos
+        return JsonResponse({'error': 'Invalid input data'})
+    
 
-def crear_intervalo_tiempo(request):
-    crear_form = CrearIntervaloTiempoForm()
+@require_GET
+def verificar_superposicion_crear(request):
+    try:
+        hora_inicio_milisegundos = int(request.GET.get('hora_inicio'))
+        hora_fin_milisegundos = int(request.GET.get('hora_fin'))
 
-    if request.method == 'POST':
-        # Guardar datos sin pasar por el formulario
-            hora_inicio_milisegundos = int(request.POST['hora_inicio'])
-            hora_fin_milisegundos = int(request.POST['hora_fin'])
-            costo_servicio = float(request.POST['costo_servicio'])
+        # Convertir milisegundos a timedelta
+        hora_inicio = timedelta(seconds=hora_inicio_milisegundos / 1000)
+        hora_fin = timedelta(seconds=hora_fin_milisegundos / 1000)
 
-            # Validar manualmente
-            if hora_inicio_milisegundos >= hora_fin_milisegundos:
-                # Limpiar los errores previos de ese campo
-                crear_form.fields['hora_inicio'].error_messages = {'invalid': None}
-                # Establecer el nuevo mensaje de error directamente en el formulario
-                crear_form.errors['hora_inicio'] = ['La hora de inicio debe ser menor que la hora de fin.']
-            else:
-                # Convertir milisegundos a segundos y luego a timedelta
-                hora_inicio = timedelta(seconds=hora_inicio_milisegundos / 1000)
-                hora_fin = timedelta(seconds=hora_fin_milisegundos / 1000)
-                print(hora_inicio)
-                print(hora_fin)
+        # Crear objetos de tiempo para hora_inicio y hora_fin
+        hora_inicio_obj = time(hour=hora_inicio.seconds // 3600, minute=(hora_inicio.seconds // 60) % 60)
+        hora_fin_obj = time(hour=hora_fin.seconds // 3600, minute=(hora_fin.seconds // 60) % 60)
 
-                # Crear objetos de tiempo para hora_inicio y hora_fin
-                hora_inicio_obj = time(hour=hora_inicio.seconds // 3600, minute=(hora_inicio.seconds // 60) % 60)
-                hora_fin_obj = time(hour=hora_fin.seconds // 3600, minute=(hora_fin.seconds // 60) % 60)
+        # Obtener todos los intervalos existentes para comparar
+        todos_los_intervalos = IntervaloTiempo.objects.all()
+        superpuesto = any(
+            intervalo.hora_inicio < hora_fin_obj < intervalo.hora_fin or
+            intervalo.hora_inicio < hora_inicio_obj < intervalo.hora_fin
+            for intervalo in todos_los_intervalos
+        )
 
-                print(hora_inicio_obj)
-                print(hora_fin_obj)
+        return JsonResponse({'superpuesto': superpuesto})
 
-                # Crear y guardar el objeto IntervaloTiempo
-                nuevo_intervalo  = IntervaloTiempo(
-                    hora_inicio=hora_inicio_obj,
-                    hora_fin=hora_fin_obj,
-                    costo_servicio=costo_servicio
-                )
+    except ValueError:
+        # Manejar errores de conversión de tipo de datos
+        return JsonResponse({'error': 'Invalid input data'})
 
-                # Verificar superposición
-                superpuestos = IntervaloTiempo.objects.filter(
-                    hora_inicio__lt=nuevo_intervalo.hora_fin,
-                    hora_fin__gt=nuevo_intervalo.hora_inicio
-                )
 
-                if superpuestos.exists():
-                    crear_form.fields['hora_inicio'].error_messages = {'invalid': None}
-                    # Establecer el nuevo mensaje de error directamente en el formulario
-                    crear_form.errors['hora_inicio'] = ['El intervalo se superpone con otro existente.']
-                else:
-                    # Guardar el nuevo intervalo si no hay superposición
-                    nuevo_intervalo.save()
-                    # Mensaje de éxito
-                    messages.success(request, 'El intervalo se ha creado exitosamente.')
-                    return redirect('/finanzas')  # Reemplaza con la vista donde se muestran los intervalos
 
 class IntervaloTiempoList(generics.ListCreateAPIView):
     queryset = IntervaloTiempo.objects.all()
@@ -137,8 +101,8 @@ def register(request):
 def error_401 (request):
     return render(request, '401.html')
 
-def error_404 (request):
-    return render(request, '404.html')
+def error_404 (request, exception):
+    return render(request, '404.html', status=404)
 
 def error_500 (request):
     return render(request, '500.html')

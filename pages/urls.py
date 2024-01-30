@@ -28,8 +28,11 @@ urlpatterns = [
     path('api/intervalo-tiempo-list/', IntervaloTiempoList.as_view(), name='intervalo-tiempo-list'),
     path('api/intervalo-tiempo-detail/<int:pk>/', IntervaloTiempoDetail.as_view(), name='intervalo-tiempo-detail'),
 
-    path('', views.index, name='index'),
+    path('api/intervalo-tiempo-superpuesto/<int:intervalo_id>/', views.verificar_superposicion, name='verificar_superposicion'),
+    path('api/intervalo-tiempo-superpuesto_crear/', views.verificar_superposicion_crear, name='verificar_superposicion_crear'),
+
 
     # URL API DATA - CONTROLER
     path('api/dataTableFinanzas', controler.dataTableFinanzas, name="dataTableFinanzas"),
+    path('', views.index, name='index'),
 ]
